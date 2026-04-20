@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+
+# --- Función formato español ---
 def formato_es(numero):
     return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # --- Cargar datos desde Excel ---
 @st.cache_data
 def cargar_datos():
@@ -28,25 +31,24 @@ fee_int_total = df.loc[("Internacional", "GASTO MEDIO"), evento_sel]
 porc_nac_def = df.loc[("Nacional", "%PARTICIPACION"), evento_sel]
 porc_int_def = df.loc[("Internacional", "%PARTICIPACION"), evento_sel]
 
-# --- Estimación inicial de inscripción (30% del gasto total) ---
+# --- Estimación inicial de inscripción ---
 insc_nac_def = fee_nac_total * 0.3
 insc_int_def = fee_int_total * 0.3
 
 otros_nac = fee_nac_total - insc_nac_def
 otros_int = fee_int_total - insc_int_def
 
-# --- Ajustes opcionales ---
-st.markdown("### 🔧 Ajustes opcionales (puedes modificarlos si conoces los datos reales)")
+# --- Ajustes ---
+st.markdown("### 🔧 Ajustes opcionales")
 
 dias_nac = st.number_input("Días de estancia (Nacionales)", value=int(dias_nac_def), step=1)
 dias_int = st.number_input("Días de estancia (Internacionales)", value=int(dias_int_def), step=1)
 
-# --- Ajuste de inscripción ---
-st.markdown("#### 🧾 Coste de inscripción al evento (puedes ajustarlo si lo conoces)")
+st.markdown("#### 🧾 Coste de inscripción")
 insc_nac = st.number_input("Coste inscripción (Nacionales)", value=round(insc_nac_def, 2), step=10.0)
 insc_int = st.number_input("Coste inscripción (Internacionales)", value=round(insc_int_def, 2), step=10.0)
 
-# Gasto total ajustado
+# Gasto total
 fee_nac = insc_nac + otros_nac
 fee_int = insc_int + otros_int
 
@@ -55,7 +57,7 @@ porc_nac = st.slider("Porcentaje de asistentes Nacionales (%)", 0, 100, int(porc
 porc_int = 100 - porc_nac
 st.markdown(f"👉 Porcentaje de asistentes Internacionales: **{porc_int}%**")
 
-# --- Cálculo de resultados ---
+# --- Cálculo ---
 if st.button("Calcular"):
     num_nac = participantes * (porc_nac / 100)
     num_int = participantes * (porc_int / 100)
@@ -65,10 +67,9 @@ if st.button("Calcular"):
     total = total_nac + total_int
 
     # Resultados
-    st.success(f"💰 Recaudación estimada total: {total:,.2f} €")
-    st.info(f"👉 Nacionales: {total_nac:,.2f} €\n👉 Internacionales: {total_int:,.2f} €")
+    st.success(f"💰 Recaudación estimada total: {formato_es(total)} €")
+    st.info(f"👉 Nacionales: {formato_es(total_nac)} €\n👉 Internacionales: {formato_es(total_int)} €")
 
-    # Párrafo destacado
     st.markdown(
         f"""
         <div style="background-color:#fff8b3; padding:10px; border-radius:10px; margin-top:10px;">
@@ -78,41 +79,52 @@ if st.button("Calcular"):
         unsafe_allow_html=True
     )
 
-    # --- Gráficas ---
-
-    # Gráfico 2: Recaudación por origen
-    # Gráfico 2: Recaudación por origen
-    # Gráfico 2: Recaudación por origen
+    # --- Gráfico 1 ---
     recaudacion_nac = round(total_nac, 2)
     recaudacion_int = round(total_int, 2)
+
     df_gasto = pd.DataFrame({
         'Origen': ['Nacionales', 'Internacionales'],
         'Recaudación (€)': [recaudacion_nac, recaudacion_int],
-        'Texto': [f"{recaudacion_nac:,.2f}", f"{recaudacion_int:,.2f}"]
+        'Texto': [formato_es(recaudacion_nac), formato_es(recaudacion_int)]
     })
-    fig2 = px.bar(df_gasto, x='Origen', y='Recaudación (€)',
-                title='Recaudación por origen de asistentes',
-                text='Texto',
-                color='Origen',
-                color_discrete_map={'Nacionales': '#f4a582', 'Internacionales': '#92c5de'})
+
+    fig2 = px.bar(
+        df_gasto,
+        x='Origen',
+        y='Recaudación (€)',
+        title='Recaudación por origen de asistentes',
+        text='Texto',
+        color='Origen',
+        color_discrete_map={'Nacionales': '#f4a582', 'Internacionales': '#92c5de'}
+    )
+
     fig2.update_traces(textposition='outside')
-    fig2.update_layout(yaxis_tickformat=",.2f")
+    fig2.update_layout(yaxis_tickformat=",.2f", separators=".,")
+
     st.plotly_chart(fig2)
 
-    # Gráfico 3: Gasto diario por asistente
+    # --- Gráfico 2 ---
     gasto_diario_nac = round(fee_nac / dias_nac, 2)
     gasto_diario_int = round(fee_int / dias_int, 2)
+
     df_dia = pd.DataFrame({
         'Origen': ['Nacionales', 'Internacionales'],
         'Gasto diario (€)': [gasto_diario_nac, gasto_diario_int],
-        'Texto': [f"{gasto_diario_nac:,.2f}", f"{gasto_diario_int:,.2f}"]
+        'Texto': [formato_es(gasto_diario_nac), formato_es(gasto_diario_int)]
     })
-    fig3 = px.bar(df_dia, x='Origen', y='Gasto diario (€)',
-                title='Gasto medio diario por asistente',
-                text='Texto',
-                color='Origen',
-                color_discrete_map={'Nacionales': '#d95f02', 'Internacionales': '#1b9e77'})
-    fig3.update_traces(textposition='outside')
-    fig3.update_layout(yaxis_tickformat=",.2f")
-    st.plotly_chart(fig3)
 
+    fig3 = px.bar(
+        df_dia,
+        x='Origen',
+        y='Gasto diario (€)',
+        title='Gasto medio diario por asistente',
+        text='Texto',
+        color='Origen',
+        color_discrete_map={'Nacionales': '#d95f02', 'Internacionales': '#1b9e77'}
+    )
+
+    fig3.update_traces(textposition='outside')
+    fig3.update_layout(yaxis_tickformat=",.2f", separators=".,")
+    
+    st.plotly_chart(fig3)
