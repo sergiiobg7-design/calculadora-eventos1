@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+def formato_es(numero):
+    return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 # --- Cargar datos desde Excel ---
 @st.cache_data
 def cargar_datos():
