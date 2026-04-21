@@ -68,7 +68,7 @@ desglose = cargar_desglose()
 st.title("🧮 Calculadora de impacto económico de reuniones")
 st.markdown(
     "Introduce los datos básicos del evento. La herramienta estima automáticamente el impacto económico "
-    "a partir del tipo de reunión, el origen de los asistentes y la pernoctación media prevista."
+    "según el tipo de reunión, el origen de los asistentes y la pernoctación media prevista."
 )
 
 # =========================
@@ -94,9 +94,6 @@ with col2:
 # =========================
 # Parámetros 2025
 # =========================
-dias_nac_ref = safe_float(parametros.loc[("Nacional", "DIAS MEDIOS"), evento_sel])
-dias_int_ref = safe_float(parametros.loc[("Internacional", "DIAS MEDIOS"), evento_sel])
-
 porc_nac_ref = safe_float(parametros.loc[("Nacional", "%PARTICIPACION"), evento_sel])
 porc_int_ref = safe_float(parametros.loc[("Internacional", "%PARTICIPACION"), evento_sel])
 
@@ -119,8 +116,9 @@ st.markdown(
     f"""
     <div style="background-color:#eef4ff; padding:14px; border-radius:12px; margin-bottom:14px;">
         <b>{evento_sel}</b><br><br>
-        <b>Nacionales</b> → Días medios: {formato_es(dias_nac_ref)} | Participación media: {formato_es(porc_nac_ref)}%<br>
-        <b>Internacionales</b> → Días medios: {formato_es(dias_int_ref)} | Participación media: {formato_es(porc_int_ref)}%
+        <b>Participación media de referencia</b><br>
+        Nacionales: {formato_es(porc_nac_ref)}%<br>
+        Internacionales: {formato_es(porc_int_ref)}%
     </div>
     """,
     unsafe_allow_html=True
@@ -145,16 +143,16 @@ if st.button("Calcular impacto económico"):
     gasto_fijo_int = viaje_int + inscripcion_int
 
     # -------------------------
-    # Coste variable por noche
+    # Costes variables por día
     # -------------------------
-    gasto_variable_noche_nac = ((alojamiento_nac + extras_nac) / dias_nac_ref) if dias_nac_ref > 0 else 0
-    gasto_variable_noche_int = ((alojamiento_int + extras_int) / dias_int_ref) if dias_int_ref > 0 else 0
+    gasto_variable_dia_nac = alojamiento_nac + extras_nac
+    gasto_variable_dia_int = alojamiento_int + extras_int
 
     # -------------------------
-    # Coste variable ajustado a la pernoctación media real
+    # Coste variable ajustado por pernoctaciones
     # -------------------------
-    gasto_variable_ajustado_nac = gasto_variable_noche_nac * pernoctaciones_por_asistente
-    gasto_variable_ajustado_int = gasto_variable_noche_int * pernoctaciones_por_asistente
+    gasto_variable_ajustado_nac = gasto_variable_dia_nac * pernoctaciones_por_asistente
+    gasto_variable_ajustado_int = gasto_variable_dia_int * pernoctaciones_por_asistente
 
     # -------------------------
     # Gasto total estimado por asistente
@@ -175,16 +173,16 @@ if st.button("Calcular impacto económico"):
     gasto_medio_asistente = (recaudacion_total / total_asistentes) if total_asistentes > 0 else 0
 
     # -------------------------
-    # Gasto medio diario por asistente y origen
-    # Importante: depende de costes fijos, variables, noches, evento y origen
+    # Gasto medio diario por asistente
+    # Depende de evento, noches y origen
     # -------------------------
     gasto_diario_nac = (
-        (gasto_fijo_nac / pernoctaciones_por_asistente) + gasto_variable_noche_nac
+        gasto_estimado_nac / pernoctaciones_por_asistente
         if pernoctaciones_por_asistente > 0 else 0
     )
 
     gasto_diario_int = (
-        (gasto_fijo_int / pernoctaciones_por_asistente) + gasto_variable_noche_int
+        gasto_estimado_int / pernoctaciones_por_asistente
         if pernoctaciones_por_asistente > 0 else 0
     )
 
@@ -198,15 +196,11 @@ if st.button("Calcular impacto económico"):
     # =========================
     total_viaje = (part_nac * viaje_nac) + (part_int * viaje_int)
     total_inscripcion = (part_nac * inscripcion_nac) + (part_int * inscripcion_int)
-
-    total_alojamiento = (
-        (part_nac * ((alojamiento_nac / dias_nac_ref) * pernoctaciones_por_asistente) if dias_nac_ref > 0 else 0) +
-        (part_int * ((alojamiento_int / dias_int_ref) * pernoctaciones_por_asistente) if dias_int_ref > 0 else 0)
+    total_alojamiento = (part_nac * alojamiento_nac * pernoctaciones_por_asistente) + (
+        part_int * alojamiento_int * pernoctaciones_por_asistente
     )
-
-    total_extras = (
-        (part_nac * ((extras_nac / dias_nac_ref) * pernoctaciones_por_asistente) if dias_nac_ref > 0 else 0) +
-        (part_int * ((extras_int / dias_int_ref) * pernoctaciones_por_asistente) if dias_int_ref > 0 else 0)
+    total_extras = (part_nac * extras_nac * pernoctaciones_por_asistente) + (
+        part_int * extras_int * pernoctaciones_por_asistente
     )
 
     # =========================
@@ -323,7 +317,8 @@ if st.button("Calcular impacto económico"):
     st.plotly_chart(fig2, use_container_width=True)
 
     # =========================
-    # Gráfico 3 - Gasto medio diario por origen
+    # Gráfico 3 - Gasto medio diario por asistente
+    # Personalizado según evento, origen y noches
     # =========================
     df_diario = pd.DataFrame({
         "Origen": ["Nacionales", "Internacionales"],
