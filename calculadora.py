@@ -174,7 +174,6 @@ if st.button("Calcular impacto económico"):
 
     # -------------------------
     # Gasto medio diario por asistente
-    # Depende de evento, noches y origen
     # -------------------------
     gasto_diario_nac = (
         gasto_estimado_nac / pernoctaciones_por_asistente
@@ -190,6 +189,13 @@ if st.button("Calcular impacto económico"):
         ((part_nac * gasto_diario_nac) + (part_int * gasto_diario_int)) / total_asistentes
         if total_asistentes > 0 else 0
     )
+
+    # Textos para no mostrar "aplica" cuando no hay asistentes de ese origen
+    texto_gasto_nac = formato_es(gasto_estimado_nac) + " €" if part_nac > 0 else "No aplica"
+    texto_gasto_int = formato_es(gasto_estimado_int) + " €" if part_int > 0 else "No aplica"
+
+    texto_gasto_diario_nac = formato_es(gasto_diario_nac) + " €" if part_nac > 0 else "No aplica"
+    texto_gasto_diario_int = formato_es(gasto_diario_int) + " €" if part_int > 0 else "No aplica"
 
     # =========================
     # Desglose total por categorías
@@ -231,8 +237,8 @@ if st.button("Calcular impacto económico"):
             <div style="background-color:#f7f7f7; padding:12px; border-radius:10px;">
                 <b>Nacionales</b><br>
                 Participantes: {part_nac}<br>
-                Gasto estimado por asistente: {formato_es(gasto_estimado_nac)} €<br>
-                Gasto medio diario por asistente: {formato_es(gasto_diario_nac)} €<br>
+                Gasto estimado por asistente: {texto_gasto_nac}<br>
+                Gasto medio diario por asistente: {texto_gasto_diario_nac}<br>
                 Recaudación estimada: {formato_es(recaudacion_nac)} €
             </div>
             """,
@@ -245,8 +251,8 @@ if st.button("Calcular impacto económico"):
             <div style="background-color:#f7f7f7; padding:12px; border-radius:10px;">
                 <b>Internacionales</b><br>
                 Participantes: {part_int}<br>
-                Gasto estimado por asistente: {formato_es(gasto_estimado_int)} €<br>
-                Gasto medio diario por asistente: {formato_es(gasto_diario_int)} €<br>
+                Gasto estimado por asistente: {texto_gasto_int}<br>
+                Gasto medio diario por asistente: {texto_gasto_diario_int}<br>
                 Recaudación estimada: {formato_es(recaudacion_int)} €
             </div>
             """,
@@ -318,7 +324,6 @@ if st.button("Calcular impacto económico"):
 
     # =========================
     # Gráfico 3 - Gasto medio diario por asistente
-    # Personalizado según evento, origen y noches
     # =========================
     df_diario = pd.DataFrame({
         "Origen": ["Nacionales", "Internacionales"],
@@ -353,10 +358,10 @@ if st.button("Calcular impacto económico"):
         f"Pernoctaciones totales estimadas: {formato_es(pernoctaciones_totales)}\n"
         f"Participación nacional: {formato_es(porc_nac_real)}%\n"
         f"Participación internacional: {formato_es(porc_int_real)}%\n"
-        f"Gasto estimado por asistente nacional: {formato_es(gasto_estimado_nac)} €\n"
-        f"Gasto estimado por asistente internacional: {formato_es(gasto_estimado_int)} €\n"
-        f"Gasto medio diario nacional: {formato_es(gasto_diario_nac)} €\n"
-        f"Gasto medio diario internacional: {formato_es(gasto_diario_int)} €\n"
+        f"Gasto estimado por asistente nacional: {texto_gasto_nac}\n"
+        f"Gasto estimado por asistente internacional: {texto_gasto_int}\n"
+        f"Gasto medio diario nacional: {texto_gasto_diario_nac}\n"
+        f"Gasto medio diario internacional: {texto_gasto_diario_int}\n"
         f"Recaudación estimada nacionales: {formato_es(recaudacion_nac)} €\n"
         f"Recaudación estimada internacionales: {formato_es(recaudacion_int)} €\n"
         f"Recaudación total estimada: {formato_es(recaudacion_total)} €\n"
