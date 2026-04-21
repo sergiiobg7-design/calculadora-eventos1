@@ -137,13 +137,13 @@ if st.button("Calcular impacto económico"):
     pernoctaciones_totales = total_asistentes * pernoctaciones_por_asistente
 
     # -------------------------
-    # Costes fijos por asistente
+    # Costes fijos por asistente (no dependen de días)
     # -------------------------
     gasto_fijo_nac = viaje_nac + inscripcion_nac
     gasto_fijo_int = viaje_int + inscripcion_int
 
     # -------------------------
-    # Costes variables por día
+    # Costes variables por día (alojamiento + extras)
     # -------------------------
     gasto_variable_dia_nac = alojamiento_nac + extras_nac
     gasto_variable_dia_int = alojamiento_int + extras_int
@@ -173,24 +173,28 @@ if st.button("Calcular impacto económico"):
     gasto_medio_asistente = (recaudacion_total / total_asistentes) if total_asistentes > 0 else 0
 
     # -------------------------
-    # Gasto medio diario por asistente
+    # Gasto medio DIARIO por asistente:
+    # Gasto total (fijo + variable) repartido entre los días de estancia.
+    # Incluye viaje, inscripción, alojamiento y extras.
     # -------------------------
     gasto_diario_nac = (
         gasto_estimado_nac / pernoctaciones_por_asistente
         if pernoctaciones_por_asistente > 0 else 0
     )
-
     gasto_diario_int = (
         gasto_estimado_int / pernoctaciones_por_asistente
         if pernoctaciones_por_asistente > 0 else 0
     )
 
-    gasto_medio_diario_asistente = (
-        ((part_nac * gasto_diario_nac) + (part_int * gasto_diario_int)) / total_asistentes
-        if total_asistentes > 0 else 0
-    )
+    # Gasto medio diario ponderado por participantes reales
+    if total_asistentes > 0:
+        gasto_medio_diario_asistente = (
+            (part_nac * gasto_diario_nac) + (part_int * gasto_diario_int)
+        ) / total_asistentes
+    else:
+        gasto_medio_diario_asistente = 0
 
-    # Textos para no mostrar "aplica" cuando no hay asistentes de ese origen
+    # Textos para no mostrar valores cuando no hay asistentes de ese origen
     texto_gasto_nac = formato_es(gasto_estimado_nac) + " €" if part_nac > 0 else "No aplica"
     texto_gasto_int = formato_es(gasto_estimado_int) + " €" if part_int > 0 else "No aplica"
 
@@ -324,25 +328,46 @@ if st.button("Calcular impacto económico"):
 
     # =========================
     # Gráfico 3 - Gasto medio diario por asistente
+    # Solo muestra barras para los orígenes con asistentes reales (> 0)
+    # Los valores vienen directamente de las categorías diarias del Excel
     # =========================
-    df_diario = pd.DataFrame({
-        "Origen": ["Nacionales", "Internacionales"],
-        "Gasto medio diario (€)": [gasto_diario_nac, gasto_diario_int],
-        "Texto": [formato_es(gasto_diario_nac), formato_es(gasto_diario_int)]
-    })
+    origenes_diario = []
+    gastos_diario = []
+    textos_diario = []
 
-    fig3 = px.bar(
-        df_diario,
-        x="Origen",
-        y="Gasto medio diario (€)",
-        text="Texto",
-        title="Gasto medio diario por asistente",
-        color="Origen",
-        color_discrete_map={"Nacionales": "#d95f02", "Internacionales": "#1b9e77"}
-    )
-    fig3.update_traces(textposition="outside")
-    fig3.update_layout(yaxis_tickformat=",.2f", separators=".,")
-    st.plotly_chart(fig3, use_container_width=True)
+    if part_nac > 0:
+        origenes_diario.append("Nacionales")
+        gastos_diario.append(gasto_diario_nac)
+        textos_diario.append(formato_es(gasto_diario_nac))
+
+    if part_int > 0:
+        origenes_diario.append("Internacionales")
+        gastos_diario.append(gasto_diario_int)
+        textos_diario.append(formato_es(gasto_diario_int))
+
+    if origenes_diario:
+        df_diario = pd.DataFrame({
+            "Origen": origenes_diario,
+            "Gasto medio diario (€)": gastos_diario,
+            "Texto": textos_diario
+        })
+
+        color_map = {"Nacionales": "#d95f02", "Internacionales": "#1b9e77"}
+
+        fig3 = px.bar(
+            df_diario,
+            x="Origen",
+            y="Gasto medio diario (€)",
+            text="Texto",
+            title="Gasto medio diario por asistente (alojamiento + gastos extras)",
+            color="Origen",
+            color_discrete_map=color_map
+        )
+        fig3.update_traces(textposition="outside")
+        fig3.update_layout(yaxis_tickformat=",.2f", separators=".,")
+        st.plotly_chart(fig3, use_container_width=True)
+    else:
+        st.info("Introduce al menos un asistente para ver el gráfico de gasto diario.")
 
     # =========================
     # Resumen
