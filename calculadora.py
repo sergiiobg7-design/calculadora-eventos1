@@ -6,125 +6,217 @@ import plotly.express as px
 def formato_es(numero):
     return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- Cargar datos desde Excel ---
+# --- Cargar datos desde Excel (hoja 2025) ---
 @st.cache_data
 def cargar_datos():
-    df = pd.read_excel("gasto_medio.xlsx", index_col=[0, 1])
+    df = pd.read_excel("gasto_medio.xlsx", sheet_name="2025")
+
+    # Nos quedamos solo con las columnas útiles
+    df = df.iloc[:, :5].copy()
+    df.columns = ["TIPO", "METRICA", "CONGRESO", "JORNADA", "CONVENCIÓN"]
+
+    # Eliminar filas completamente vacías
+    df = df.dropna(how="all")
+
+    # Limpiar texto
+    df["TIPO"] = df["TIPO"].astype(str).str.strip()
+    df["METRICA"] = df["METRICA"].astype(str).str.strip()
+
+    # Convertir %PARTICIPACION si viniera en decimal
+    mask = df["METRICA"] == "%PARTICIPACION"
+    if mask.any():
+        valores = df.loc[mask, ["CONGRESO", "JORNADA", "CONVENCIÓN"]].astype(float)
+        if (valores.max().max() <= 1.0):
+            df.loc[mask, ["CONGRESO", "JORNADA", "CONVENCIÓN"]] = valores * 100
+
+    df = df.set_index(["TIPO", "METRICA"])
     return df
 
 df = cargar_datos()
 
-# --- Interfaz de usuario ---
+# --- Interfaz ---
 st.title("🧮 Calculadora de impacto económico de reuniones")
-st.markdown("Selecciona el tipo de reunión y el número estimado de asistentes para predecir la recaudación.")
+st.markdown(
+    "Introduce los datos reales del evento. La herramienta utiliza como referencia las medias 2025 "
+    "por tipología de reunión y tipo de asistente."
+)
 
-evento_sel = st.selectbox("Tipo de evento", df.columns)
-participantes = st.number_input("Número total de participantes", min_value=1, value=100)
+evento_sel = st.selectbox("Tipo de reunión", df.columns)
 
-# --- Valores por defecto desde Excel ---
-dias_nac_def = df.loc[("Nacional", "DIAS MEDIOS"), evento_sel]
-dias_int_def = df.loc[("Internacional", "DIAS MEDIOS"), evento_sel]
+# --- Parámetros medios 2025 desde Excel ---
+dias_nac_ref = float(df.loc[("Nacional", "DIAS MEDIOS"), evento_sel])
+dias_int_ref = float(df.loc[("Internacional", "DIAS MEDIOS"), evento_sel])
 
-fee_nac_total = df.loc[("Nacional", "GASTO MEDIO"), evento_sel]
-fee_int_total = df.loc[("Internacional", "GASTO MEDIO"), evento_sel]
+gasto_nac_ref = float(df.loc[("Nacional", "GASTO MEDIO"), evento_sel])
+gasto_int_ref = float(df.loc[("Internacional", "GASTO MEDIO"), evento_sel])
 
-porc_nac_def = df.loc[("Nacional", "%PARTICIPACION"), evento_sel]
-porc_int_def = df.loc[("Internacional", "%PARTICIPACION"), evento_sel]
+porc_nac_ref = float(df.loc[("Nacional", "%PARTICIPACION"), evento_sel])
+porc_int_ref = float(df.loc[("Internacional", "%PARTICIPACION"), evento_sel])
 
-# --- Estimación inicial de inscripción ---
-insc_nac_def = fee_nac_total * 0.3
-insc_int_def = fee_int_total * 0.3
+# --- Datos manuales del evento ---
+st.markdown("### 📥 Datos del evento")
 
-otros_nac = fee_nac_total - insc_nac_def
-otros_int = fee_int_total - insc_int_def
+part_nac = st.number_input("Número de participantes nacionales", min_value=0, value=0, step=1)
+part_int = st.number_input("Número de participantes internacionales", min_value=0, value=0, step=1)
+pernoctaciones = st.number_input("Número total de pernoctaciones", min_value=0, value=0, step=1)
 
-# --- Ajustes ---
-st.markdown("### 🔧 Ajustes opcionales")
+st.markdown("### 💰 Ingresos del evento")
+ing_inscripciones = st.number_input("Ingresos por inscripciones (€)", min_value=0.0, value=0.0, step=100.0)
+ing_alojamiento = st.number_input("Ingresos por alojamiento (€)", min_value=0.0, value=0.0, step=100.0)
+ing_acompanantes = st.number_input("Ingresos por acompañantes (€)", min_value=0.0, value=0.0, step=100.0)
+otros_ingresos = st.number_input("Otros ingresos (€)", min_value=0.0, value=0.0, step=100.0)
 
-dias_nac = st.number_input("Días de estancia (Nacionales)", value=int(dias_nac_def), step=1)
-dias_int = st.number_input("Días de estancia (Internacionales)", value=int(dias_int_def), step=1)
-
-st.markdown("#### 🧾 Coste de inscripción")
-insc_nac = st.number_input("Coste inscripción (Nacionales)", value=round(insc_nac_def, 2), step=10.0)
-insc_int = st.number_input("Coste inscripción (Internacionales)", value=round(insc_int_def, 2), step=10.0)
-
-# Gasto total
-fee_nac = insc_nac + otros_nac
-fee_int = insc_int + otros_int
-
-# --- Porcentajes ---
-porc_nac = st.slider("Porcentaje de asistentes Nacionales (%)", 0, 100, int(porc_nac_def))
-porc_int = 100 - porc_nac
-st.markdown(f"👉 Porcentaje de asistentes Internacionales: **{porc_int}%**")
+# --- Referencia 2025 ---
+st.markdown("### 📊 Referencia media 2025")
+st.markdown(
+    f"""
+    <div style="background-color:#eef4ff; padding:12px; border-radius:10px; margin-bottom:10px;">
+        <b>{evento_sel}</b><br>
+        Nacionales → Gasto medio: {formato_es(gasto_nac_ref)} € | Días medios: {formato_es(dias_nac_ref)} | % participación: {formato_es(porc_nac_ref)}%<br>
+        Internacionales → Gasto medio: {formato_es(gasto_int_ref)} € | Días medios: {formato_es(dias_int_ref)} | % participación: {formato_es(porc_int_ref)}%
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- Cálculo ---
 if st.button("Calcular"):
-    num_nac = participantes * (porc_nac / 100)
-    num_int = participantes * (porc_int / 100)
+    total_asistentes = part_nac + part_int
+    ingresos_totales = ing_inscripciones + ing_alojamiento + ing_acompanantes + otros_ingresos
 
-    total_nac = num_nac * fee_nac
-    total_int = num_int * fee_int
-    total = total_nac + total_int
+    gasto_medio_asistente = ingresos_totales / total_asistentes if total_asistentes > 0 else 0
+    pernoctaciones_por_asistente = pernoctaciones / total_asistentes if total_asistentes > 0 else 0
 
-    # Resultados
-    st.success(f"💰 Recaudación estimada total: {formato_es(total)} €")
-    st.info(f"👉 Nacionales: {formato_es(total_nac)} €\n👉 Internacionales: {formato_es(total_int)} €")
+    porc_nac_real = (part_nac / total_asistentes * 100) if total_asistentes > 0 else 0
+    porc_int_real = (part_int / total_asistentes * 100) if total_asistentes > 0 else 0
+
+    # Impacto teórico según medias 2025
+    impacto_teorico_nac = part_nac * gasto_nac_ref
+    impacto_teorico_int = part_int * gasto_int_ref
+    impacto_teorico_total = impacto_teorico_nac + impacto_teorico_int
+
+    estancia_media_real = pernoctaciones_por_asistente
+
+    # --- Resultados principales ---
+    st.markdown("## ✅ Resultados del evento")
+
+    st.success(f"💰 Ingresos totales del evento: {formato_es(ingresos_totales)} €")
 
     st.markdown(
         f"""
-        <div style="background-color:#fff8b3; padding:10px; border-radius:10px; margin-top:10px;">
-            <b>Porcentaje de participación:</b> Nacionales: {porc_nac}% &nbsp;&nbsp; Internacionales: {porc_int}%
+        <div style="background-color:#f6f6f6; padding:12px; border-radius:10px; margin-bottom:10px;">
+            <b>Asistentes totales:</b> {total_asistentes}<br>
+            <b>Nacionales:</b> {part_nac} ({formato_es(porc_nac_real)}%)<br>
+            <b>Internacionales:</b> {part_int} ({formato_es(porc_int_real)}%)<br>
+            <b>Pernoctaciones totales:</b> {pernoctaciones}<br>
+            <b>Gasto medio por asistente:</b> {formato_es(gasto_medio_asistente)} €<br>
+            <b>Pernoctaciones por asistente:</b> {formato_es(pernoctaciones_por_asistente)}
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # --- Gráfico 1 ---
-    recaudacion_nac = round(total_nac, 2)
-    recaudacion_int = round(total_int, 2)
+    # --- Comparativa con referencia ---
+    st.markdown("## 📌 Comparativa con referencia 2025")
+    st.info(
+        f"👉 Impacto teórico según medias 2025: {formato_es(impacto_teorico_total)} €\n"
+        f"👉 Impacto teórico nacionales: {formato_es(impacto_teorico_nac)} €\n"
+        f"👉 Impacto teórico internacionales: {formato_es(impacto_teorico_int)} €"
+    )
 
-    df_gasto = pd.DataFrame({
-        'Origen': ['Nacionales', 'Internacionales'],
-        'Recaudación (€)': [recaudacion_nac, recaudacion_int],
-        'Texto': [formato_es(recaudacion_nac), formato_es(recaudacion_int)]
+    st.markdown(
+        f"""
+        <div style="background-color:#fff8b3; padding:10px; border-radius:10px; margin-top:10px;">
+            <b>Referencia media {evento_sel} 2025:</b><br>
+            Participación media nacionales: {formato_es(porc_nac_ref)}% &nbsp;&nbsp; | &nbsp;&nbsp;
+            Participación media internacionales: {formato_es(porc_int_ref)}%<br>
+            Estancia media nacionales: {formato_es(dias_nac_ref)} días &nbsp;&nbsp; | &nbsp;&nbsp;
+            Estancia media internacionales: {formato_es(dias_int_ref)} días
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # --- Gráfico 1: asistentes por origen ---
+    df_asistentes = pd.DataFrame({
+        "Origen": ["Nacionales", "Internacionales"],
+        "Asistentes": [part_nac, part_int],
+        "Texto": [str(part_nac), str(part_int)]
+    })
+
+    fig1 = px.bar(
+        df_asistentes,
+        x="Origen",
+        y="Asistentes",
+        text="Texto",
+        title="Asistentes por origen",
+        color="Origen",
+        color_discrete_map={"Nacionales": "#f4a582", "Internacionales": "#92c5de"}
+    )
+    fig1.update_traces(textposition="outside")
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # --- Gráfico 2: ingresos por categoría ---
+    df_ingresos = pd.DataFrame({
+        "Categoría": ["Inscripciones", "Alojamiento", "Acompañantes", "Otros ingresos"],
+        "Importe (€)": [ing_inscripciones, ing_alojamiento, ing_acompanantes, otros_ingresos],
+        "Texto": [
+            formato_es(ing_inscripciones),
+            formato_es(ing_alojamiento),
+            formato_es(ing_acompanantes),
+            formato_es(otros_ingresos)
+        ]
     })
 
     fig2 = px.bar(
-        df_gasto,
-        x='Origen',
-        y='Recaudación (€)',
-        title='Recaudación por origen de asistentes',
-        text='Texto',
-        color='Origen',
-        color_discrete_map={'Nacionales': '#f4a582', 'Internacionales': '#92c5de'}
+        df_ingresos,
+        x="Categoría",
+        y="Importe (€)",
+        text="Texto",
+        title="Ingresos por categoría"
     )
-
-    fig2.update_traces(textposition='outside')
+    fig2.update_traces(textposition="outside")
     fig2.update_layout(yaxis_tickformat=",.2f", separators=".,")
+    st.plotly_chart(fig2, use_container_width=True)
 
-    st.plotly_chart(fig2)
-
-    # --- Gráfico 2 ---
-    gasto_diario_nac = round(fee_nac / dias_nac, 2)
-    gasto_diario_int = round(fee_int / dias_int, 2)
-
-    df_dia = pd.DataFrame({
-        'Origen': ['Nacionales', 'Internacionales'],
-        'Gasto diario (€)': [gasto_diario_nac, gasto_diario_int],
-        'Texto': [formato_es(gasto_diario_nac), formato_es(gasto_diario_int)]
+    # --- Gráfico 3: impacto teórico por origen según medias 2025 ---
+    df_impacto = pd.DataFrame({
+        "Origen": ["Nacionales", "Internacionales"],
+        "Impacto teórico (€)": [impacto_teorico_nac, impacto_teorico_int],
+        "Texto": [formato_es(impacto_teorico_nac), formato_es(impacto_teorico_int)]
     })
 
     fig3 = px.bar(
-        df_dia,
-        x='Origen',
-        y='Gasto diario (€)',
-        title='Gasto medio diario por asistente',
-        text='Texto',
-        color='Origen',
-        color_discrete_map={'Nacionales': '#d95f02', 'Internacionales': '#1b9e77'}
+        df_impacto,
+        x="Origen",
+        y="Impacto teórico (€)",
+        text="Texto",
+        title="Impacto teórico por origen según medias 2025",
+        color="Origen",
+        color_discrete_map={"Nacionales": "#d95f02", "Internacionales": "#1b9e77"}
     )
-
-    fig3.update_traces(textposition='outside')
+    fig3.update_traces(textposition="outside")
     fig3.update_layout(yaxis_tickformat=",.2f", separators=".,")
-    
-    st.plotly_chart(fig3)
+    st.plotly_chart(fig3, use_container_width=True)
+
+    # --- Resumen final listo para copiar ---
+    st.markdown("## 📝 Resumen")
+    st.text_area(
+        "Resumen del cálculo",
+        value=(
+            f"Tipo de reunión: {evento_sel}\n"
+            f"Asistentes totales: {total_asistentes}\n"
+            f"Nacionales: {part_nac} ({formato_es(porc_nac_real)}%)\n"
+            f"Internacionales: {part_int} ({formato_es(porc_int_real)}%)\n"
+            f"Pernoctaciones totales: {pernoctaciones}\n"
+            f"Ingresos por inscripciones: {formato_es(ing_inscripciones)} €\n"
+            f"Ingresos por alojamiento: {formato_es(ing_alojamiento)} €\n"
+            f"Ingresos por acompañantes: {formato_es(ing_acompanantes)} €\n"
+            f"Otros ingresos: {formato_es(otros_ingresos)} €\n"
+            f"Ingresos totales: {formato_es(ingresos_totales)} €\n"
+            f"Gasto medio por asistente: {formato_es(gasto_medio_asistente)} €\n"
+            f"Pernoctaciones por asistente: {formato_es(pernoctaciones_por_asistente)}\n"
+            f"Impacto teórico según medias 2025: {formato_es(impacto_teorico_total)} €"
+        ),
+        height=280
+    )
