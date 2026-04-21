@@ -222,11 +222,11 @@ if st.button("Calcular impacto económico"):
 
     with col_res1:
         st.metric("Asistentes totales", f"{int(total_asistentes)}")
-        st.metric("Pernoctaciones totales estimadas", f"{formato_es(pernoctaciones_totales)}")
+        st.metric("Pernoctaciones por asistente", f"{formato_es(pernoctaciones_por_asistente)}")
 
     with col_res2:
         st.metric("Recaudación total estimada", f"{formato_es(recaudacion_total)} €")
-        st.metric("Pernoctaciones por asistente", f"{formato_es(pernoctaciones_por_asistente)}")
+        st.metric("Pernoctaciones totales estimadas", f"{formato_es(pernoctaciones_totales)}")
 
     with col_res3:
         st.metric("Gasto medio por asistente", f"{formato_es(gasto_medio_asistente)} €")
@@ -359,7 +359,7 @@ if st.button("Calcular impacto económico"):
             x="Origen",
             y="Gasto medio diario (€)",
             text="Texto",
-            title="Gasto medio diario por asistente (alojamiento + gastos extras)",
+            title="Gasto medio diario por asistente",
             color="Origen",
             color_discrete_map=color_map
         )
